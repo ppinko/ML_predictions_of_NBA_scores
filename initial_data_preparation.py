@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import csv
+import os
 
 
 def transform_to_datatime(date):
@@ -15,7 +16,7 @@ def transform_to_datatime(date):
     return datetime.strptime(date, '%B %d %Y')
 
 
-def create_team_data(df, team, season):
+def create_team_data(df, team, season, out_dir):
     '''
     Store csv data for a particular team for particular season.
     '''
@@ -29,6 +30,7 @@ def create_team_data(df, team, season):
     df_team = df[(df['HomeTeam'] == team) | (df['AwayTeam'] == team)]
 
     out_file = team + '_' + season + '.csv'
+    out_file = os.path.join(out_dir, out_file)
     with open(out_file, 'w', newline='') as csvfile:
         csvWriter = csv.writer(csvfile, delimiter=',')
         csvWriter.writerow(vals.keys())
@@ -78,22 +80,36 @@ def create_team_data(df, team, season):
                 vals['valid'] = 1
 
 
+def prepare_data(file_name):
+    '''
+    Prepare data for particular season.
+    '''
+    season = file_name.rstrip('_pbp.csv')
+
+    eog = 'End of Game'
+    gameType = 'regular'
+    use_cols = {'Date': str, 'GameType': str, 'WinningTeam': str, 'AwayTeam': str,
+                'HomeTeam': str, 'AwayScore': np.uint8, 'HomeScore': np.uint8,
+                'AwayPlay': str}
+    df = pd.read_csv(file_name, usecols=use_cols.keys(), dtype=use_cols)
+    df = df[(df['AwayPlay'] == eog) & (df['GameType'] == gameType)]
+    df['HomeWin'] = np.uint8(df.WinningTeam == df.HomeTeam)
+    df['date'] = df.Date.apply(transform_to_datatime)
+
+    # create output directory if not exist
+    out_dir = 'out_' + season
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+
+    # create input files
+    df2 = df[['HomeTeam']]
+    df2.drop_duplicates(inplace=True)
+    df2.sort_values('HomeTeam', inplace=True)
+    for i in range(df2.shape[0]):
+        team = str(df2.iat[i, 0])
+        create_team_data(df, team, season, out_dir)
+
+
+# Example
 file_name = '2019-20_pbp.csv'
-
-eog = 'End of Game'
-gameType = 'regular'
-use_cols = {'Date': str, 'GameType': str, 'WinningTeam': str, 'AwayTeam': str,
-            'HomeTeam': str, 'AwayScore': np.uint8, 'HomeScore': np.uint8,
-            'AwayPlay': str}
-df = pd.read_csv(file_name, usecols=use_cols.keys(), dtype=use_cols)
-df = df[(df['AwayPlay'] == eog) & (df['GameType'] == gameType)]
-df['HomeWin'] = np.uint8(df.WinningTeam == df.HomeTeam)
-df['date'] = df.Date.apply(transform_to_datatime)
-
-# create input files
-df2 = df[['HomeTeam']]
-df2.drop_duplicates(inplace=True)
-df2.sort_values('HomeTeam', inplace=True)
-for i in range(df2.shape[0]):
-    team = str(df2.iat[i, 0])
-    create_team_data(df, team, '2019-20')
+prepare_data(file_name)
