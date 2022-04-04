@@ -16,7 +16,7 @@ def transform_to_datatime(date):
     return datetime.strptime(date, '%B %d %Y')
 
 
-def create_team_data(df, team, season, out_dir):
+def create_team_data(df, team, out_dir):
     '''
     Store csv data for a particular team for particular season.
     '''
@@ -29,7 +29,7 @@ def create_team_data(df, team, season, out_dir):
 
     df_team = df[(df['HomeTeam'] == team) | (df['AwayTeam'] == team)]
 
-    out_file = team + '_' + season + '.csv'
+    out_file = team + '.csv'
     out_file = os.path.join(out_dir, out_file)
     with open(out_file, 'w', newline='') as csvfile:
         csvWriter = csv.writer(csvfile, delimiter=',')
@@ -80,12 +80,10 @@ def create_team_data(df, team, season, out_dir):
                 vals['valid'] = 1
 
 
-def prepare_data(file_name):
+def extract_dataframe(file_name):
     '''
-    Prepare data for particular season.
+    Extract dataframe from csv file.
     '''
-    season = file_name.rstrip('_pbp.csv')
-
     eog = 'End of Game'
     gameType = 'regular'
     use_cols = {'Date': str, 'GameType': str, 'WinningTeam': str, 'AwayTeam': str,
@@ -95,9 +93,27 @@ def prepare_data(file_name):
     df = df[(df['AwayPlay'] == eog) & (df['GameType'] == gameType)]
     df['HomeWin'] = np.uint8(df.WinningTeam == df.HomeTeam)
     df['date'] = df.Date.apply(transform_to_datatime)
+    return df
+
+
+def extract_dirname(file_name):
+    '''
+    Extract season number and creates name for the output directory.
+    '''
+    season = file_name.rstrip('_pbp.csv')
+    out_dir = 'out_' + season
+    return out_dir
+
+
+def prepare_data(file_name):
+    '''
+    Prepare data for particular season.
+    '''
+    # extract dataframe
+    df = extract_dataframe(file_name)
 
     # create output directory if not exist
-    out_dir = 'out_' + season
+    out_dir = extract_dirname(file_name)
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
 
@@ -107,7 +123,7 @@ def prepare_data(file_name):
     df2.sort_values('HomeTeam', inplace=True)
     for i in range(df2.shape[0]):
         team = str(df2.iat[i, 0])
-        create_team_data(df, team, season, out_dir)
+        create_team_data(df, team, out_dir)
 
 
 # Example
